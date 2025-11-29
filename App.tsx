@@ -1,3 +1,5 @@
+import 'react-native-gesture-handler';
+import DocumentPicker, {DocumentPickerResponse} from 'react-native-document-picker';
 /**
  * Simplified feed app with horizontal paged feeds and comment modal.
  */
@@ -17,6 +19,7 @@ import {
   Modal,
   ScrollView,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {NavigationContainer} from '@react-navigation/native';
@@ -31,9 +34,19 @@ type Post = {
   liked: boolean;
   imageUrl?: string;
   videoUrl?: string;
+  documentUrl?: string;
+  documentName?: string;
 };
 
 const Stack = createNativeStackNavigator();
+
+
+// Firebase is auto-initialized by @react-native-firebase/app using google-services.json
+// Firestore and Storage are accessed via their respective packages
+
+// Example usage:
+// const db = firestore();
+// const storageRef = storage();
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -93,23 +106,9 @@ function FeedScreen({navigation, route}: any) {
 
   const feedPages: Post[][] = [
     [
-      {
-        id: 1,
-        user: 'Alice',
-        content: 'Look at this beautiful forest I visited today!',
-        likes: 12,
-        comments: ['Stunning!', 'So peaceful.'],
-        liked: false,
-        imageUrl: 'https://images.pexels.com/photos/302804/pexels-photo-302804.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      },
-      {
-        id: 2,
-        user: 'Bob',
-        content: 'Caught this amazing sunset on video!',
-        likes: 25, comments: ['Wow!', 'Incredible colors!'], liked: false,
-        videoUrl: 'https://images.pexels.com/photos/36744/sunset-sun-red-sky-setting-sun.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      },
-      {id: 3, user: 'Carol', content: 'Just a regular text post here. Loving the new features on Aqualink!', likes: 3, comments: ['Me too!'], liked: false},
+      {id: 1, user: 'Alice', content: 'Just joined Aqualink! Excited to connect with everyone.', likes: 2, comments: ['Welcome Alice!'], liked: false},
+      {id: 2, user: 'Bob', content: 'What a beautiful day to share some photos!', likes: 5, comments: ['Nice!', 'Show us more!'], liked: false},
+      {id: 3, user: 'Carol', content: 'Loving the new features on Aqualink!', likes: 3, comments: ['Me too!'], liked: false},
     ],
     [
       {id: 1, user: 'Dave', content: 'Anyone up for a meetup this weekend?', likes: 1, comments: ['I am!'], liked: false},
@@ -150,17 +149,13 @@ function FeedScreen({navigation, route}: any) {
       const {newPost} = route.params;
       setPages(prevPages => {
         const newPages = [...prevPages];
-        // Add the new post to the first page of the feed.
-        // Also, add the new user's avatar to our avatars list if they don't exist.
         if (!avatars[newPost.user]) {
-          avatars[newPost.user] = 'https://randomuser.me/api/portraits/women/7.jpg'; // Defaulting to Grace's avatar for 'You'
+          avatars[newPost.user] = avatars['Grace'];
         }
         newPages[0] = [newPost, ...newPages[0]];
         return newPages;
       });
-      // Reset the param to avoid re-adding the post on re-render
       navigation.setParams({newPost: undefined});
-      // Scroll the horizontal feed back to the first page to see the new post
       feedListRef.current?.scrollToIndex({index: 0, animated: true});
     }
   }, [route.params?.newPost, navigation]);
@@ -235,6 +230,14 @@ function FeedScreen({navigation, route}: any) {
               <View style={styles.playButtonOverlay} />
               <Text style={styles.playButtonIcon}>▶</Text>
             </View>
+          )}
+          {post.documentUrl && (
+            <TouchableOpacity style={styles.documentContainer}>
+              <Text style={styles.documentIcon}>📄</Text>
+              <Text style={styles.documentName} numberOfLines={1}>
+                {post.documentName || 'Attached Document'}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
         <View style={styles.cardBottomSection}>
@@ -421,24 +424,94 @@ function CreatePostScreen({navigation, route}: any) {
       avatar: 'https://randomuser.me/api/portraits/women/7.jpg',
     };
   const [postContent, setPostContent] = useState('');
+  const [attachment, setAttachment] = useState<DocumentPickerResponse | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const MAX_POST_LENGTH = 280;
+  const UPLOAD_ENDPOINT = 'https://file.io';
 
-  const handlePost = () => {
-    if (postContent.trim() === '') return;
+  const uploadAttachment = async (file: DocumentPickerResponse) => {
+    // Fail fast if network is blocked or slow; fallback to local URI.
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Upload timeout')), 12000),
+    );
 
-    const newPost: Post = {
-      id: Date.now(), // Use timestamp for a unique ID
-      user: currentUser.name || 'You',
-      content: postContent,
-      likes: 0,
-      comments: [],
-      liked: false,
-    };
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name || 'upload',
+      type: file.type || 'application/octet-stream',
+    } as any);
 
-    // Navigate back to Feed and pass the new post as a parameter
-    navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
+    const response = (await Promise.race([
+      fetch(`${UPLOAD_ENDPOINT}?expires=1w`, {
+        method: 'POST',
+        body: formData,
+      }),
+      timeout,
+    ])) as Response;
+
+    const data = await response.json();
+    if (!response.ok || !data.link) {
+      throw new Error(data?.message || 'Upload failed');
+    }
+    return data.link as string;
   };
 
+  const handleFilePick = async () => {
+    try {
+      const res = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.images, DocumentPicker.types.video, DocumentPicker.types.pdf],
+      });
+      setAttachment(res);
+    } catch (err) {
+      if (DocumentPicker.isCancel(err)) {
+        return;
+      }
+      console.error('Error picking file:', err);
+    }
+  };
+
+  const handlePost = async () => {
+    if (postContent.trim() === '' && !attachment) return;
+    setIsUploading(true);
+
+    try {
+      const newPost: Post = {
+        id: Date.now(),
+        user: currentUser.name || 'You',
+        content: postContent,
+        likes: 0,
+        comments: [],
+        liked: false,
+      };
+
+      if (attachment) {
+        let remoteUrl = attachment.uri;
+        try {
+          remoteUrl = await uploadAttachment(attachment);
+        } catch (error) {
+          console.error('Upload failed, using local URI:', error);
+        }
+        const mime = attachment.type || '';
+        if (mime.startsWith('image/')) {
+          newPost.imageUrl = remoteUrl;
+        } else if (mime.startsWith('video/')) {
+          newPost.videoUrl = remoteUrl;
+        } else {
+          newPost.documentUrl = remoteUrl;
+          newPost.documentName = attachment.name || 'Attached Document';
+        }
+      }
+
+      navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
+      setPostContent('');
+      setAttachment(null);
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <View style={styles.centerScreen}>
@@ -454,8 +527,25 @@ function CreatePostScreen({navigation, route}: any) {
       <Text style={styles.charCounter}>
         {postContent.length} / {MAX_POST_LENGTH}
       </Text>
+
+      <View style={styles.attachmentSection}>
+        <Button title="Attach File" onPress={handleFilePick} />
+        {attachment && (
+          <Text style={styles.attachmentName} numberOfLines={1}>
+            Attached: {attachment.name || 'File'}
+          </Text>
+        )}
+      </View>
+
+      {isUploading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1877f2" />
+          <Text style={{marginTop: 6}}>Casting your wave...</Text>
+        </View>
+      )}
+
       <View style={{width: '80%', marginTop: 10}}>
-        <Button title="Cast" onPress={handlePost} />
+        <Button title="Cast" onPress={handlePost} disabled={isUploading} />
         <View style={{marginTop: 12}}>
           <Button
             title="Cancel"
@@ -526,6 +616,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
     paddingBottom: 12,
+  },
+  documentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f2f5',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  documentIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  documentName: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
   },
   postImage: {
     width: '100%',
@@ -674,6 +781,21 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 12,
     color: '#65676b',
+  },
+  attachmentSection: {
+    width: '80%',
+    marginVertical: 15,
+  },
+  attachmentName: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#65676b',
+    fontStyle: 'italic',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 15,
   },
 });
 
