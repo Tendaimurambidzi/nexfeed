@@ -46,6 +46,7 @@ function App() {
             <Stack.Screen name="PostDetail" component={PostDetailScreen} />
             <Stack.Screen name="Search" component={SearchScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </Stack.Group>
           <Stack.Group screenOptions={{presentation: 'modal'}}>
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
@@ -78,6 +79,12 @@ function FeedScreen({navigation, route}: any) {
     Ivy: 'https://randomuser.me/api/portraits/women/9.jpg',
     Jack: 'https://randomuser.me/api/portraits/men/10.jpg',
     Kate: 'https://randomuser.me/api/portraits/women/11.jpg',
+  };
+
+  // Let's assume 'Grace' is our logged-in user for this session.
+  const currentUser = {
+    name: 'Grace',
+    avatar: avatars['Grace'],
   };
 
   const feedPages: Post[][] = [
@@ -124,7 +131,11 @@ function FeedScreen({navigation, route}: any) {
       const {newPost} = route.params;
       setPages(prevPages => {
         const newPages = [...prevPages];
-        // Add the new post to the first page of the feed
+        // Add the new post to the first page of the feed.
+        // Also, add the new user's avatar to our avatars list if they don't exist.
+        if (!avatars[newPost.user]) {
+          avatars[newPost.user] = 'https://randomuser.me/api/portraits/women/7.jpg'; // Defaulting to Grace's avatar for 'You'
+        }
         newPages[0] = [newPost, ...newPages[0]];
         return newPages;
       });
@@ -262,7 +273,7 @@ function FeedScreen({navigation, route}: any) {
           <Text style={styles.navIcon}>🔎</Text>
           <Text style={styles.navText}>Scan</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('CreatePost')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('CreatePost', {currentUser})}>
           <Text style={styles.navIcon}>🌊</Text>
           <Text style={styles.navText}>Cast</Text>
         </TouchableOpacity>
@@ -273,6 +284,14 @@ function FeedScreen({navigation, route}: any) {
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Profile')}>
           <Text style={styles.navIcon}>⚓</Text>
           <Text style={styles.navText}>Harbour</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => {}}>
+          <Text style={styles.navIcon}>📡</Text>
+          <Text style={styles.navText}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.navIcon}>⚙️</Text>
+          <Text style={styles.navText}>Bridge</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -310,6 +329,15 @@ function NotificationsScreen() {
   );
 }
 
+function SettingsScreen({navigation}: any) {
+  return (
+    <View style={styles.centerScreen}>
+      <Text>Settings Screen</Text>
+      <Button title="Go back" onPress={() => navigation.goBack()} />
+    </View>
+  );
+}
+
 function ProfileScreen({navigation}: any) {
   return (
     <View style={styles.centerScreen}>
@@ -319,15 +347,17 @@ function ProfileScreen({navigation}: any) {
   );
 }
 
-function CreatePostScreen({navigation}: any) {
+function CreatePostScreen({navigation, route}: any) {
+  const {currentUser} = route.params;
   const [postContent, setPostContent] = useState('');
+  const MAX_POST_LENGTH = 280;
 
   const handlePost = () => {
     if (postContent.trim() === '') return;
 
     const newPost: Post = {
       id: Date.now(), // Use timestamp for a unique ID
-      user: 'You', // Or a dynamic current user
+      user: currentUser.name,
       content: postContent,
       likes: 0,
       comments: [],
@@ -347,9 +377,13 @@ function CreatePostScreen({navigation}: any) {
         placeholder="What's happening?"
         value={postContent}
         onChangeText={setPostContent}
+        maxLength={MAX_POST_LENGTH}
         multiline
       />
-      <View style={{width: '80%'}}>
+      <Text style={styles.charCounter}>
+        {postContent.length} / {MAX_POST_LENGTH}
+      </Text>
+      <View style={{width: '80%', marginTop: 10}}>
         <Button title="Cast" onPress={handlePost} />
         <View style={{marginTop: 12}}>
           <Button
@@ -519,6 +553,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlignVertical: 'top',
     backgroundColor: '#fff',
+  },
+  charCounter: {
+    width: '80%',
+    textAlign: 'right',
+    fontSize: 12,
+    color: '#65676b',
   },
 });
 
