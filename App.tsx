@@ -204,14 +204,16 @@ function FeedScreen({navigation, route}: any) {
         })
       }>
       <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Image source={{uri: avatars[post.user] || avatars['Alice']}} style={styles.avatar} />
-          <Text style={styles.username}>{post.user}</Text>
+        <View style={styles.cardTopSection}>
+          <View style={styles.cardHeader}>
+            <Image source={{uri: avatars[post.user] || avatars['Alice']}} style={styles.avatar} />
+            <Text style={[styles.username, styles.textWhite]}>{post.user}</Text>
+          </View>
+          <Text style={[styles.content, styles.textWhite]}>{post.content}</Text>
         </View>
-        <Text style={styles.content}>{post.content}</Text>
-        <View style={styles.actionsRow}>
+        <View style={styles.cardBottomSection}>
           <TouchableOpacity onPress={() => handleLike(pageIdx, post.id)} style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>💧</Text>
+            <Text style={[styles.actionIcon, {color: post.liked ? '#1877f2' : '#65676b'}]}>💧</Text>
             <Text style={styles.actionText}>{post.likes} Splashes</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -461,12 +463,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginHorizontal: 16,
     borderRadius: 12,
-    padding: 16,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.08,
     shadowRadius: 4,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -485,18 +487,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#222',
   },
+  textWhite: {
+    color: '#fff',
+  },
   content: {
     fontSize: 15,
     color: '#333',
-    marginBottom: 8,
+  },
+  cardTopSection: {
+    backgroundColor: '#dc3545',
+    padding: 16,
+  },
+  cardBottomSection: {
+    backgroundColor: '#fff',
+    padding: 16,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f2f5',
-    marginTop: 12,
   },
   actionBtn: {
     flexDirection: 'row',
