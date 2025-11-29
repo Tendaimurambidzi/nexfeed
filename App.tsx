@@ -1,8 +1,7 @@
 /**
  * Simplified feed app with horizontal paged feeds and comment modal.
  */
-
-import React, {useRef, useState} from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -39,13 +38,18 @@ function App() {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login" screenOptions={{headerShown: false}}>
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Feed" component={FeedScreen} />
-          <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="Messages" component={MessagesScreen} />
-          <Stack.Screen name="PostDetail" component={PostDetailScreen} />
-          <Stack.Screen name="Search" component={SearchScreen} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Group>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Feed" component={FeedScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Messages" component={MessagesScreen} />
+            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+            <Stack.Screen name="Search" component={SearchScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          </Stack.Group>
+          <Stack.Group screenOptions={{presentation: 'modal'}}>
+            <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+          </Stack.Group>
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
@@ -61,7 +65,7 @@ function LoginScreen({navigation}: any) {
   );
 }
 
-function FeedScreen({navigation}: any) {
+function FeedScreen({navigation, route}: any) {
   const avatars: Record<string, string> = {
     Alice: 'https://randomuser.me/api/portraits/women/1.jpg',
     Bob: 'https://randomuser.me/api/portraits/men/2.jpg',
@@ -114,6 +118,23 @@ function FeedScreen({navigation}: any) {
   const [activePostForComment, setActivePostForComment] = useState<{pageIdx: number; postId: number} | null>(null);
   const feedListRef = useRef<FlatList<Post[]> | null>(null);
   const {width} = useWindowDimensions();
+
+  useEffect(() => {
+    if (route.params?.newPost) {
+      const {newPost} = route.params;
+      setPages(prevPages => {
+        const newPages = [...prevPages];
+        // Add the new post to the first page of the feed
+        newPages[0] = [newPost, ...newPages[0]];
+        return newPages;
+      });
+      // Reset the param to avoid re-adding the post on re-render
+      navigation.setParams({newPost: undefined});
+      // Scroll the horizontal feed back to the first page to see the new post
+      feedListRef.current?.scrollToIndex({index: 0, animated: true});
+    }
+  }, [route.params?.newPost, navigation]);
+
 
   const handleLike = (pageIdx: number, postId: number) => {
     setPages(prev =>
@@ -241,8 +262,9 @@ function FeedScreen({navigation}: any) {
           <Text style={styles.navIcon}>🔎</Text>
           <Text style={styles.navText}>Scan</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItemAction}>
-          <Text style={styles.navIconAction}>＋</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('CreatePost')}>
+          <Text style={styles.navIcon}>🌊</Text>
+          <Text style={styles.navText}>Cast</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Notifications')}>
           <Text style={styles.navIcon}>🔔</Text>
@@ -293,6 +315,50 @@ function ProfileScreen({navigation}: any) {
     <View style={styles.centerScreen}>
       <Text>Profile Screen</Text>
       <Button title="Go back" onPress={() => navigation.goBack()} />
+    </View>
+  );
+}
+
+function CreatePostScreen({navigation}: any) {
+  const [postContent, setPostContent] = useState('');
+
+  const handlePost = () => {
+    if (postContent.trim() === '') return;
+
+    const newPost: Post = {
+      id: Date.now(), // Use timestamp for a unique ID
+      user: 'You', // Or a dynamic current user
+      content: postContent,
+      likes: 0,
+      comments: [],
+      liked: false,
+    };
+
+    // Navigate back to Feed and pass the new post as a parameter
+    navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
+  };
+
+
+  return (
+    <View style={styles.centerScreen}>
+      <Text style={styles.loginTitle}>Create a Wave</Text>
+      <TextInput
+        style={styles.postInput}
+        placeholder="What's happening?"
+        value={postContent}
+        onChangeText={setPostContent}
+        multiline
+      />
+      <View style={{width: '80%'}}>
+        <Button title="Cast" onPress={handlePost} />
+        <View style={{marginTop: 12}}>
+          <Button
+            title="Cancel"
+            onPress={() => navigation.goBack()}
+            color="#ff6347"
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -430,27 +496,9 @@ const styles = StyleSheet.create({
     gap: 2,
     flex: 1,
   },
-  navItemAction: {
-    backgroundColor: '#1877f2',
-    borderRadius: 18,
-    width: 60,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
-  },
   navIcon: {
     fontSize: 24,
     color: '#65676b',
-  },
-  navIconAction: {
-    fontSize: 24,
-    color: '#fff',
   },
   navText: {
     fontSize: 11,
@@ -459,6 +507,18 @@ const styles = StyleSheet.create({
   navTextActive: {
     color: '#1877f2',
     fontWeight: 'bold',
+  },
+  postInput: {
+    width: '80%',
+    height: 150,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    fontSize: 16,
+    textAlignVertical: 'top',
+    backgroundColor: '#fff',
   },
 });
 
