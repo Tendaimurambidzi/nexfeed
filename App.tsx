@@ -43,13 +43,15 @@ function LoginScreen({ navigation }: any) {
 function FeedScreen({ navigation }: any) {
   // Navigation bar buttons
   const navButtons = [
-    { label: 'Home', onPress: () => {}, icon: '🏠' },
-    { label: 'Friends', onPress: () => {}, icon: '👥' },
-    { label: 'Inbox', onPress: () => navigation.navigate('Messages'), icon: '✉️' },
-    { label: 'Reels', onPress: () => {}, icon: '🎬' },
-    { label: 'Notifications', onPress: () => {}, icon: '🔔' },
-    { label: 'Search', onPress: () => {}, icon: '🔍' },
-    { label: 'Settings', onPress: () => {}, icon: '⚙️' },
+    { label: 'Harbour', onPress: () => {}, icon: '⚓' },
+    { label: 'Crew', onPress: () => {}, icon: '👥' },
+    { label: 'Buoy', onPress: () => navigation.navigate('Messages'), icon: '🛟' },
+    { label: 'Ripples', onPress: () => {}, icon: '🔄' },
+    { label: 'Pings', onPress: () => {}, icon: '📡' },
+    { label: 'DeepScan', onPress: () => {}, icon: '🔍' },
+    { label: 'Compass', onPress: () => {}, icon: '🧭' },
+    { label: 'Placeholder1', onPress: () => {}, icon: '⬜' },
+    { label: 'Placeholder2', onPress: () => {}, icon: '⬜' },
   ];
   // ...existing code for avatars, feedPages, state, handlers, renderers, and return...
   const avatars = {
@@ -142,14 +144,14 @@ function FeedScreen({ navigation }: any) {
       <Text style={styles.content}>{post.content}</Text>
       <View style={styles.actionsRow}>
         <TouchableOpacity onPress={() => handleLike(pageIdx, post.id)} style={styles.actionBtn}>
-          <Text style={{ color: post.liked ? '#1877f2' : '#333', fontWeight: 'bold' }}>👍 {post.liked ? 'Unlike' : 'Like'} ({post.likes})</Text>
+          <Text style={{ color: post.liked ? '#1877f2' : '#333', fontWeight: 'bold' }}>💦 {post.liked ? 'Unsplash' : 'Splash'} ({post.likes})</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActivePost({ pageIdx, postId: post.id })} style={styles.actionBtn}>
-          <Text style={{ color: '#333', fontWeight: 'bold' }}>💬 Comment</Text>
+          <Text style={{ color: '#333', fontWeight: 'bold' }}>📢 Echoes</Text>
         </TouchableOpacity>
       </View>
       <View style={{ marginTop: 8 }}>
-        <Text style={styles.commentsTitle}>Comments:</Text>
+        <Text style={styles.commentsTitle}>Echoes:</Text>
         {post.comments.map((c, i) => (
           <Text key={i} style={styles.commentText}>- {c}</Text>
         ))}
@@ -157,11 +159,11 @@ function FeedScreen({ navigation }: any) {
           <View style={styles.commentInputRow}>
             <TextInput
               style={styles.commentInput}
-              placeholder="Add a comment..."
+              placeholder="Add an echo..."
               value={commentText}
               onChangeText={setCommentText}
             />
-            <Button title="Post" onPress={() => handleComment(pageIdx, post.id)} />
+            <Button title="Cast" onPress={() => handleComment(pageIdx, post.id)} />
           </View>
         )}
       </View>
@@ -188,7 +190,7 @@ function FeedScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f2f5' }}>
-      <Text style={{ fontSize: 28, fontWeight: 'bold', margin: 16 }}>News Feed</Text>
+      <Text style={{ fontSize: 28, fontWeight: 'bold', margin: 16 }}>Tide</Text>
       <FlatList
         data={pages}
         renderItem={renderFeedPage}
@@ -199,14 +201,21 @@ function FeedScreen({ navigation }: any) {
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
       />
-      {/* Professional Navigation Bar */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#fff', paddingVertical: 10, borderTopWidth: 1, borderColor: '#e0e0e0', elevation: 10 }}>
-        {navButtons.map(btn => (
-          <TouchableOpacity key={btn.label} onPress={btn.onPress} style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={{ fontSize: 22 }}>{btn.icon}</Text>
-            <Text style={{ fontSize: 12, color: '#333', marginTop: 2 }}>{btn.label}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* Ocean Navigation Bar - now horizontally scrollable */}
+      <View style={{ backgroundColor: '#fff', paddingVertical: 10, borderTopWidth: 1, borderColor: '#e0e0e0', elevation: 10 }}>
+        <FlatList
+          data={navButtons}
+          renderItem={({ item: btn }) => (
+            <TouchableOpacity key={btn.label} onPress={btn.onPress} style={{ alignItems: 'center', width: 64, marginHorizontal: 4 }}>
+              <Text style={{ fontSize: 22 }}>{btn.icon}</Text>
+              <Text style={{ fontSize: 12, color: '#333', marginTop: 2 }}>{btn.label}</Text>
+            </TouchableOpacity>
+          )}
+          keyExtractor={btn => btn.label}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 8 }}
+        />
       </View>
     </View>
   );
