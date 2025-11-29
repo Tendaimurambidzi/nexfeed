@@ -103,6 +103,7 @@ function FeedScreen({navigation, route}: any) {
   const [activePostForComment, setActivePostForComment] = useState<{postId: number} | null>(null);
   const [activeTab, setActiveTab] = useState('Tide');
 
+  // Add new post from CreatePostScreen (instant UI update)
   useEffect(() => {
     if (route.params?.newPost) {
       const {newPost} = route.params;
@@ -168,7 +169,13 @@ function FeedScreen({navigation, route}: any) {
           <Text style={[styles.content, styles.textWhite]}>{post.content}</Text>
           {post.imageUrl && <Image source={{uri: post.imageUrl}} style={styles.postImage} />}
           {post.videoUrl && (
-            <Video source={{uri: post.videoUrl}} style={styles.postImage} controls resizeMode="cover" paused />
+            <Video
+              source={{uri: post.videoUrl}}
+              style={styles.postVideo}
+              controls
+              resizeMode="cover"
+              paused
+            />
           )}
           {post.documentUrl && (
             <TouchableOpacity style={styles.documentContainer}>
@@ -360,31 +367,14 @@ function CreatePostScreen({navigation, route}: any) {
   const [attachment, setAttachment] = useState<DocumentPickerResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const MAX_POST_LENGTH = 280;
-  const UPLOAD_ENDPOINT = 'https://file.io';
+  // Remove file.io, use Firebase Storage
 
   const uploadAttachment = async (file: DocumentPickerResponse) => {
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 12000));
-
-    const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name || 'upload',
-      type: file.type || 'application/octet-stream',
-    } as any);
-
-    const response = (await Promise.race([
-      fetch(`${UPLOAD_ENDPOINT}?expires=1w`, {
-        method: 'POST',
-        body: formData,
-      }),
-      timeout,
-    ])) as Response;
-
-    const data = await response.json();
-    if (!response.ok || !data.link) {
-      throw new Error(data?.message || 'Upload failed');
-    }
-    return data.link as string;
+    // Upload to Firebase Storage
+    const ext = file.name?.split('.').pop() || 'mp4';
+    const ref = storage().ref(`casts/${Date.now()}_${file.name}`);
+    await ref.putFile(file.uri);
+    return await ref.getDownloadURL();
   };
 
   const handleFilePick = async () => {
@@ -416,20 +406,31 @@ function CreatePostScreen({navigation, route}: any) {
       };
 
       if (attachment) {
-        let remoteUrl = attachment.uri;
         try {
-          remoteUrl = await uploadAttachment(attachment);
+          const remoteUrl = await uploadAttachment(attachment);
+          const mime = attachment.type || '';
+          const name = attachment.name || '';
+          if (mime.startsWith('image/')) {
+            newPost.imageUrl = remoteUrl;
+          } else if (mime.startsWith('video/')) {
+            newPost.videoUrl = remoteUrl;
+          } else {
+            newPost.documentUrl = remoteUrl;
+            newPost.documentName = name || 'Attached Document';
+          }
         } catch (error) {
           console.error('Upload failed, using local URI:', error);
-        }
-        const mime = attachment.type || '';
-        if (mime.startsWith('image/')) {
-          newPost.imageUrl = remoteUrl;
-        } else if (mime.startsWith('video/')) {
-          newPost.videoUrl = remoteUrl;
-        } else {
-          newPost.documentUrl = remoteUrl;
-          newPost.documentName = attachment.name || 'Attached Document';
+          const fallbackUrl = attachment.uri;
+          const mime = attachment.type || '';
+          const name = attachment.name || '';
+          if (mime.startsWith('image/')) {
+            newPost.imageUrl = fallbackUrl;
+          } else if (mime.startsWith('video/')) {
+            newPost.videoUrl = fallbackUrl;
+          } else {
+            newPost.documentUrl = fallbackUrl;
+            newPost.documentName = name || 'Attached Document';
+          }
         }
       }
 
@@ -469,7 +470,7 @@ function CreatePostScreen({navigation, route}: any) {
 
       {isUploading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1877f2" />
+          <ActivityIndicator size="large" color="#ffb300" />
           <Text style={{marginTop: 6}}>Casting your wave...</Text>
         </View>
       )}
@@ -558,12 +559,19 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: '100%',
-    height: 200,
+    height: 280,
     borderRadius: 8,
     marginTop: 8,
   },
+  postVideo: {
+    width: '100%',
+    height: 440,
+    borderRadius: 8,
+    marginTop: 8,
+    backgroundColor: '#000',
+  },
   cardTopSection: {
-    backgroundColor: '#1877f2',
+    backgroundColor: '#ffb300',
     padding: 16,
   },
   cardBottomSection: {
@@ -648,7 +656,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   navItemActive: {
-    backgroundColor: '#1877f2',
+    backgroundColor: '#ffb300',
   },
   navIcon: {
     fontSize: 24,
