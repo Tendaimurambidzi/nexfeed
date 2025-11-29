@@ -1,15 +1,34 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
+ * Simplified feed app with horizontal paged feeds and comment modal.
  */
 
-import React, { useState } from 'react';
-import { StatusBar, StyleSheet, useColorScheme, View, Text, Button, TextInput, TouchableOpacity, FlatList, Image, useWindowDimensions } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, {useRef, useState} from 'react';
+import {
+  StatusBar,
+  StyleSheet,
+  useColorScheme,
+  View,
+  Text,
+  Button,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  Image,
+  useWindowDimensions,
+  Modal,
+} from 'react-native';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+
+type Post = {
+  id: number;
+  user: string;
+  content: string;
+  likes: number;
+  comments: string[];
+  liked: boolean;
+};
 
 const Stack = createNativeStackNavigator();
 
@@ -19,42 +38,31 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="Login">
+        <Stack.Navigator initialRouteName="Login" screenOptions={{headerShown: false}}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Messages" component={MessagesScreen} />
+          <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+          <Stack.Screen name="Search" component={SearchScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
   );
 }
 
-function LoginScreen({ navigation }: any) {
-  // Simple visible login screen
+function LoginScreen({navigation}: any) {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 24, marginBottom: 20 }}>Welcome to Aqualink</Text>
+    <View style={styles.centerScreen}>
+      <Text style={styles.loginTitle}>Welcome to Aqualink</Text>
       <Button title="Go to Feed" onPress={() => navigation.replace('Feed')} />
     </View>
   );
 }
 
-function FeedScreen({ navigation }: any) {
-  // Navigation bar buttons
-  const navButtons = [
-    { label: 'Harbour', onPress: () => {}, icon: '⚓' },
-    { label: 'Crew', onPress: () => {}, icon: '👥' },
-    { label: 'Buoy', onPress: () => navigation.navigate('Messages'), icon: '🛟' },
-    { label: 'Ripples', onPress: () => {}, icon: '🔄' },
-    { label: 'Pings', onPress: () => {}, icon: '📡' },
-    { label: 'DeepScan', onPress: () => {}, icon: '🔍' },
-    { label: 'Compass', onPress: () => {}, icon: '🧭' },
-    { label: 'Placeholder1', onPress: () => {}, icon: '⬜' },
-    { label: 'Placeholder2', onPress: () => {}, icon: '⬜' },
-  ];
-  // ...existing code for avatars, feedPages, state, handlers, renderers, and return...
-  const avatars = {
+function FeedScreen({navigation}: any) {
+  const avatars: Record<string, string> = {
     Alice: 'https://randomuser.me/api/portraits/women/1.jpg',
     Bob: 'https://randomuser.me/api/portraits/men/2.jpg',
     Carol: 'https://randomuser.me/api/portraits/women/3.jpg',
@@ -68,175 +76,250 @@ function FeedScreen({ navigation }: any) {
     Kate: 'https://randomuser.me/api/portraits/women/11.jpg',
   };
 
-  // 6 pages of feeds, each with different posts
-  const feedPages = [
+  const feedPages: Post[][] = [
     [
-      { id: 1, user: 'Alice', content: 'Just joined Aqualink! Excited to connect with everyone.', likes: 2, comments: ['Welcome Alice!'], liked: false },
-      { id: 2, user: 'Bob', content: 'What a beautiful day to share some photos!', likes: 5, comments: ['Nice!', 'Show us more!'], liked: false },
+      {id: 1, user: 'Alice', content: 'Just joined Aqualink! Excited to connect with everyone.', likes: 2, comments: ['Welcome Alice!'], liked: false},
+      {id: 2, user: 'Bob', content: 'What a beautiful day to share some photos!', likes: 5, comments: ['Nice!', 'Show us more!'], liked: false},
+      {id: 3, user: 'Carol', content: 'Loving the new features on Aqualink!', likes: 3, comments: ['Me too!'], liked: false},
     ],
     [
-      { id: 1, user: 'Carol', content: 'Loving the new features on Aqualink!', likes: 3, comments: ['Me too!'], liked: false },
-      { id: 2, user: 'Dave', content: 'Anyone up for a meetup this weekend?', likes: 1, comments: ['I am!'], liked: false },
+      {id: 1, user: 'Dave', content: 'Anyone up for a meetup this weekend?', likes: 1, comments: ['I am!'], liked: false},
+      {id: 2, user: 'Eve', content: 'Check out my latest blog post!', likes: 4, comments: ['Great read!'], liked: false},
+      {id: 3, user: 'Frank', content: 'Just finished a marathon!', likes: 6, comments: ['Congrats!'], liked: false},
     ],
     [
-      { id: 1, user: 'Eve', content: 'Check out my latest blog post!', likes: 4, comments: ['Great read!'], liked: false },
-      { id: 2, user: 'Frank', content: 'Just finished a marathon!', likes: 6, comments: ['Congrats!'], liked: false },
+      {id: 1, user: 'Grace', content: 'Aqualink is the best!', likes: 7, comments: ['Absolutely!'], liked: false},
+      {id: 2, user: 'Henry', content: 'Looking for book recommendations.', likes: 2, comments: ['Try "1984"!'], liked: false},
+      {id: 3, user: 'Ivy', content: 'Just adopted a puppy!', likes: 8, comments: ['So cute!'], liked: false},
     ],
     [
-      { id: 1, user: 'Grace', content: 'Aqualink is the best!', likes: 7, comments: ['Absolutely!'], liked: false },
-      { id: 2, user: 'Henry', content: 'Looking for book recommendations.', likes: 2, comments: ['Try "1984"!'], liked: false },
+      {id: 1, user: 'Jack', content: 'Who wants to play chess?', likes: 3, comments: ['I do!'], liked: false},
+      {id: 2, user: 'Kate', content: 'Started a new job today!', likes: 5, comments: ['Congrats!'], liked: false},
+      {id: 3, user: 'Alice', content: 'Enjoying a sunny day at the park.', likes: 2, comments: ['Nice!'], liked: false},
     ],
     [
-      { id: 1, user: 'Ivy', content: 'Just adopted a puppy!', likes: 8, comments: ['So cute!'], liked: false },
-      { id: 2, user: 'Jack', content: 'Who wants to play chess?', likes: 3, comments: ['I do!'], liked: false },
+      {id: 1, user: 'Bob', content: 'Back to sharing photos!', likes: 5, comments: [], liked: false},
+      {id: 2, user: 'Carol', content: 'The features keep getting better.', likes: 4, comments: [], liked: false},
+      {id: 3, user: 'Dave', content: 'Meetup was a success!', likes: 9, comments: [], liked: false},
     ],
     [
-      { id: 1, user: 'Kate', content: 'Started a new job today!', likes: 5, comments: ['Congrats!'], liked: false },
-      { id: 2, user: 'Alice', content: 'Enjoying a sunny day at the park.', likes: 2, comments: ['Nice!'], liked: false },
+      {id: 1, user: 'Eve', content: 'New blog post is live!', likes: 6, comments: [], liked: false},
+      {id: 2, user: 'Frank', content: 'Training for the next marathon.', likes: 8, comments: [], liked: false},
+      {id: 3, user: 'Grace', content: 'Still the best app.', likes: 10, comments: [], liked: false},
     ],
   ];
 
-  // State for all pages
-  const [pages, setPages] = useState(feedPages);
+  const [pages, setPages] = useState<Post[][]>(feedPages);
   const [commentText, setCommentText] = useState('');
-  const [activePost, setActivePost] = useState<{ pageIdx: number; postId: number } | null>(null);
+  const [activePostForComment, setActivePostForComment] = useState<{pageIdx: number; postId: number} | null>(null);
+  const feedListRef = useRef<FlatList<Post[]> | null>(null);
+  const {width} = useWindowDimensions();
 
-  // Like handler for a post in a page
   const handleLike = (pageIdx: number, postId: number) => {
-    setPages(pages =>
-      pages.map((posts, idx) =>
+    setPages(prev =>
+      prev.map((posts, idx) =>
         idx === pageIdx
-          ? posts.map(post =>
-              post.id === postId
-                ? { ...post, likes: post.liked ? post.likes - 1 : post.likes + 1, liked: !post.liked }
-                : post
+          ? posts.map(p =>
+              p.id === postId ? {...p, likes: p.liked ? p.likes - 1 : p.likes + 1, liked: !p.liked} : p,
             )
-          : posts
-      )
+          : posts,
+      ),
     );
   };
 
-  // Comment handler for a post in a page
-  const handleComment = (pageIdx: number, postId: number) => {
-    if (commentText.trim() === '') return;
-    setPages(pages =>
-      pages.map((posts, idx) =>
+  const handleComment = () => {
+    if (!activePostForComment || commentText.trim() === '') return;
+    const {pageIdx, postId} = activePostForComment;
+    setPages(prev =>
+      prev.map((posts, idx) =>
         idx === pageIdx
-          ? posts.map(post =>
-              post.id === postId
-                ? { ...post, comments: [...post.comments, commentText] }
-                : post
-            )
-          : posts
-      )
+          ? posts.map(p => (p.id === postId ? {...p, comments: [...p.comments, commentText]} : p))
+          : posts,
+      ),
     );
     setCommentText('');
-    setActivePost(null);
+    setActivePostForComment(null);
   };
 
-  // Render a single post
-  const renderPost = (pageIdx: number) => ({ item: post }: any) => (
-    <View style={styles.card}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Image source={{ uri: avatars[post.user] || avatars['Alice'] }} style={styles.avatar} />
-        <Text style={styles.username}>{post.user}</Text>
+  const renderPost = (pageIdx: number) => ({item: post}: {item: Post}) => (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() =>
+        navigation.navigate('PostDetail', {
+          post,
+          avatar: avatars[post.user] || avatars['Alice'],
+        })
+      }>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Image source={{uri: avatars[post.user] || avatars['Alice']}} style={styles.avatar} />
+          <Text style={styles.username}>{post.user}</Text>
+        </View>
+        <Text style={styles.content}>{post.content}</Text>
+        <View style={styles.actionsRow}>
+          <TouchableOpacity onPress={() => handleLike(pageIdx, post.id)} style={styles.actionBtn}>
+            <Text style={styles.actionIcon}>💧</Text>
+            <Text style={styles.actionText}>{post.likes} Splashes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActivePostForComment({pageIdx, postId: post.id})}
+            style={styles.actionBtn}>
+            <Text style={styles.actionIcon}>📢</Text>
+            <Text style={styles.actionText}>{post.comments.length} Echoes</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.content}>{post.content}</Text>
-      <View style={styles.actionsRow}>
-        <TouchableOpacity onPress={() => handleLike(pageIdx, post.id)} style={styles.actionBtn}>
-          <Text style={{ color: post.liked ? '#1877f2' : '#333', fontWeight: 'bold' }}>💦 {post.liked ? 'Unsplash' : 'Splash'} ({post.likes})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActivePost({ pageIdx, postId: post.id })} style={styles.actionBtn}>
-          <Text style={{ color: '#333', fontWeight: 'bold' }}>📢 Echoes</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={{ marginTop: 8 }}>
-        <Text style={styles.commentsTitle}>Echoes:</Text>
-        {post.comments.map((c, i) => (
-          <Text key={i} style={styles.commentText}>- {c}</Text>
-        ))}
-        {activePost && activePost.pageIdx === pageIdx && activePost.postId === post.id && (
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Add an echo..."
-              value={commentText}
-              onChangeText={setCommentText}
-            />
-            <Button title="Cast" onPress={() => handleComment(pageIdx, post.id)} />
-          </View>
-        )}
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 
-  // Render a single feed page (vertical feed)
-  const { width } = useWindowDimensions();
-  const renderFeedPage = ({ item: posts, index: pageIdx }: any) => (
-    <View style={{ width, flex: 1, paddingTop: 8 }}>
+  const renderFeedPage = ({item: posts, index: pageIdx}: {item: Post[]; index: number}) => (
+    <View style={{width, flex: 1, paddingTop: 8}}>
       <FlatList
         data={posts}
         renderItem={renderPost(pageIdx)}
         keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'space-between',
-          paddingBottom: 16,
-        }}
+        contentContainerStyle={{flexGrow: 1, justifyContent: 'space-between', paddingVertical: 8}}
+        ItemSeparatorComponent={() => <View style={{height: 12}} />}
         showsVerticalScrollIndicator={false}
+        ListFooterComponent={<View style={{height: 8}} />}
       />
     </View>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f0f2f5' }}>
-      <Text style={{ fontSize: 28, fontWeight: 'bold', margin: 16 }}>Tide</Text>
+    <View style={styles.feedScreen}>
       <FlatList
+        ref={feedListRef}
         data={pages}
         renderItem={renderFeedPage}
         keyExtractor={(_, idx) => idx.toString()}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1 }}
       />
-      {/* Ocean Navigation Bar - now horizontally scrollable */}
-      <View style={{ backgroundColor: '#fff', paddingVertical: 10, borderTopWidth: 1, borderColor: '#e0e0e0', elevation: 10 }}>
-        <FlatList
-          data={navButtons}
-          renderItem={({ item: btn }) => (
-            <TouchableOpacity key={btn.label} onPress={btn.onPress} style={{ alignItems: 'center', width: 64, marginHorizontal: 4 }}>
-              <Text style={{ fontSize: 22 }}>{btn.icon}</Text>
-              <Text style={{ fontSize: 12, color: '#333', marginTop: 2 }}>{btn.label}</Text>
-            </TouchableOpacity>
-          )}
-          keyExtractor={btn => btn.label}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 8 }}
-        />
+
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={activePostForComment !== null}
+        onRequestClose={() => setActivePostForComment(null)}>
+        <SafeAreaProvider>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Echoes</Text>
+              <Button title="Close" onPress={() => setActivePostForComment(null)} />
+            </View>
+            <FlatList
+              data={
+                activePostForComment
+                  ? pages[activePostForComment.pageIdx].find(p => p.id === activePostForComment.postId)?.comments || []
+                  : []
+              }
+              renderItem={({item}) => <Text style={styles.commentText}>- {item}</Text>}
+              keyExtractor={(item, index) => `${item}-${index}`}
+              contentContainerStyle={{padding: 16}}
+            />
+            <View style={styles.commentInputRow}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Add an echo..."
+                value={commentText}
+                onChangeText={setCommentText}
+              />
+              <Button title="Cast" onPress={handleComment} />
+            </View>
+          </View>
+        </SafeAreaProvider>
+      </Modal>
+
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.navItem}>
+          <Text style={[styles.navIcon, {color: '#1877f2'}]}>⌂</Text>
+          <Text style={[styles.navText, styles.navTextActive]}>Tide</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Search')}>
+          <Text style={styles.navIcon}>🔎</Text>
+          <Text style={styles.navText}>Scan</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItemAction}>
+          <Text style={styles.navIconAction}>＋</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Notifications')}>
+          <Text style={styles.navIcon}>🔔</Text>
+          <Text style={styles.navText}>Activity</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Profile')}>
+          <Text style={styles.navIcon}>⚓</Text>
+          <Text style={styles.navText}>Harbour</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function ProfileScreen({ navigation }: any) {
-  // Placeholder profile screen
+function PostDetailScreen({route}: any) {
+  const {post, avatar} = route.params;
   return (
-    <></>
+    <View style={{flex: 1, backgroundColor: '#fff', paddingTop: 20}}>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Image source={{uri: avatar}} style={styles.avatar} />
+          <Text style={styles.username}>{post.user}</Text>
+        </View>
+        <Text style={styles.content}>{post.content}</Text>
+      </View>
+    </View>
   );
 }
 
-function MessagesScreen({ navigation }: any) {
-  // Placeholder messages screen
+function SearchScreen() {
   return (
-    <></>
+    <View style={styles.centerScreen}>
+      <Text>Search Screen</Text>
+    </View>
   );
 }
 
+function NotificationsScreen() {
+  return (
+    <View style={styles.centerScreen}>
+      <Text>Notifications Screen</Text>
+    </View>
+  );
+}
+
+function ProfileScreen({navigation}: any) {
+  return (
+    <View style={styles.centerScreen}>
+      <Text>Profile Screen</Text>
+      <Button title="Go back" onPress={() => navigation.goBack()} />
+    </View>
+  );
+}
+
+function MessagesScreen({navigation}: any) {
+  return (
+    <View style={styles.centerScreen}>
+      <Text>Messages Screen</Text>
+      <Button title="Go back" onPress={() => navigation.goBack()} />
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
+  feedScreen: {
+    flex: 1,
+    backgroundColor: '#f0f2f5',
+  },
+  centerScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginTitle: {
+    fontSize: 24,
+    marginBottom: 20,
+  },
   card: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -244,9 +327,14 @@ const styles = StyleSheet.create({
     padding: 16,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.08,
     shadowRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   avatar: {
     width: 40,
@@ -268,38 +356,109 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f2f5',
+    marginTop: 12,
   },
   actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 18,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
   },
-  commentsTitle: {
+  actionIcon: {
+    fontSize: 18,
+    color: '#65676b',
+  },
+  actionText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#65676b',
+    fontWeight: '600',
+  },
+  modalView: {
+    flex: 1,
+    marginTop: 22,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 4,
-    color: '#1877f2',
-  },
-  commentText: {
-    marginLeft: 8,
-    color: '#555',
-    fontSize: 13,
-    marginTop: 2,
   },
   commentInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   commentInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 4,
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginRight: 8,
     fontSize: 14,
     backgroundColor: '#fafbfc',
+  },
+  commentText: {
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 8,
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 2,
+    flex: 1,
+  },
+  navItemAction: {
+    backgroundColor: '#1877f2',
+    borderRadius: 18,
+    width: 60,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  navIcon: {
+    fontSize: 24,
+    color: '#65676b',
+  },
+  navIconAction: {
+    fontSize: 24,
+    color: '#fff',
+  },
+  navText: {
+    fontSize: 11,
+    color: '#65676b',
+  },
+  navTextActive: {
+    color: '#1877f2',
+    fontWeight: 'bold',
   },
 });
 
