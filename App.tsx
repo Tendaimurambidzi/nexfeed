@@ -20,6 +20,8 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import storage from '@react-native-firebase/storage';
 import Video from 'react-native-video';
 
 type Post = {
@@ -493,12 +495,53 @@ function CreatePostScreen({navigation, route}: any) {
       avatar: 'https://randomuser.me/api/portraits/women/7.jpg',
     };
   const [postContent, setPostContent] = useState('');
+  const [attachment, setAttachment] = useState<ImagePickerResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const MAX_POST_LENGTH = 280;
   // Remove file.io, use Firebase Storage
 
+  const uploadAttachment = async (response: ImagePickerResponse) => {
+    const asset = response.assets?.[0];
+    if (!asset) return;
+    const ref = storage().ref(`casts/${Date.now()}_${asset.fileName || 'media'}`);
+    await ref.putFile(asset.uri!);
+    return await ref.getDownloadURL();
+  };
+
+  const handlePickFromGallery = () => {
+    launchImageLibrary({
+      mediaType: 'mixed',
+      includeBase64: false,
+      maxHeight: 2000,
+      maxWidth: 2000,
+    }, (response) => {
+      if (response.didCancel) return;
+      if (response.errorMessage) {
+        console.error('ImagePicker Error: ', response.errorMessage);
+        return;
+      }
+      setAttachment(response);
+    });
+  };
+
+  const handleTakePhoto = () => {
+    launchCamera({
+      mediaType: 'mixed',
+      includeBase64: false,
+      maxHeight: 2000,
+      maxWidth: 2000,
+    }, (response) => {
+      if (response.didCancel) return;
+      if (response.errorMessage) {
+        console.error('Camera Error: ', response.errorMessage);
+        return;
+      }
+      setAttachment(response);
+    });
+  };
+
   const handlePost = async () => {
-    if (postContent.trim() === '') return;
+    if (postContent.trim() === '' && !attachment) return;
     setIsUploading(true);
 
     try {
@@ -511,10 +554,34 @@ function CreatePostScreen({navigation, route}: any) {
         liked: false,
       };
 
+      if (attachment) {
+        try {
+          const remoteUrl = await uploadAttachment(attachment);
+          const asset = attachment.assets?.[0];
+          const mime = asset?.type || '';
+          if (mime.startsWith('image/')) {
+            newPost.imageUrl = remoteUrl;
+          } else if (mime.startsWith('video/')) {
+            newPost.videoUrl = remoteUrl;
+          }
+        } catch (error) {
+          console.error('Upload failed, using local URI:', error);
+          const asset = attachment.assets?.[0];
+          const fallbackUrl = asset?.uri;
+          const mime = asset?.type || '';
+          if (mime.startsWith('image/')) {
+            newPost.imageUrl = fallbackUrl;
+          } else if (mime.startsWith('video/')) {
+            newPost.videoUrl = fallbackUrl;
+          }
+        }
+      }
+
       navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
       setPostContent('');
+      setAttachment(null);
     } catch (error) {
-      console.error('Error uploading attachment:', error);
+      console.error('Error:', error);
     } finally {
       setIsUploading(false);
     }
@@ -534,6 +601,17 @@ function CreatePostScreen({navigation, route}: any) {
       <Text style={styles.charCounter}>
         {postContent.length} / {MAX_POST_LENGTH}
       </Text>
+
+      <View style={styles.attachmentSection}>
+        <Button title="Pick from Gallery" onPress={handlePickFromGallery} />
+        <View style={{marginTop: 10}} />
+        <Button title="Take Photo/Video" onPress={handleTakePhoto} />
+        {attachment && attachment.assets && attachment.assets[0] && (
+          <Text style={styles.attachmentName} numberOfLines={1}>
+            Attached: {attachment.assets[0].fileName || 'Media'}
+          </Text>
+        )}
+      </View>
 
       {isUploading && (
         <View style={styles.loadingContainer}>
