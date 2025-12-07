@@ -20,7 +20,6 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DocumentPicker, {DocumentPickerResponse} from 'react-native-document-picker';
 import Video from 'react-native-video';
 
 type Post = {
@@ -494,35 +493,12 @@ function CreatePostScreen({navigation, route}: any) {
       avatar: 'https://randomuser.me/api/portraits/women/7.jpg',
     };
   const [postContent, setPostContent] = useState('');
-  const [attachment, setAttachment] = useState<DocumentPickerResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const MAX_POST_LENGTH = 280;
   // Remove file.io, use Firebase Storage
 
-  const uploadAttachment = async (file: DocumentPickerResponse) => {
-    // Upload to Firebase Storage
-    const ext = file.name?.split('.').pop() || 'mp4';
-    const ref = storage().ref(`casts/${Date.now()}_${file.name}`);
-    await ref.putFile(file.uri);
-    return await ref.getDownloadURL();
-  };
-
-  const handleFilePick = async () => {
-    try {
-      const res = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.images, DocumentPicker.types.video, DocumentPicker.types.pdf],
-      });
-      setAttachment(res);
-    } catch (err) {
-      if (DocumentPicker.isCancel(err)) {
-        return;
-      }
-      console.error('Error picking file:', err);
-    }
-  };
-
   const handlePost = async () => {
-    if (postContent.trim() === '' && !attachment) return;
+    if (postContent.trim() === '') return;
     setIsUploading(true);
 
     try {
@@ -535,38 +511,8 @@ function CreatePostScreen({navigation, route}: any) {
         liked: false,
       };
 
-      if (attachment) {
-        try {
-          const remoteUrl = await uploadAttachment(attachment);
-          const mime = attachment.type || '';
-          const name = attachment.name || '';
-          if (mime.startsWith('image/')) {
-            newPost.imageUrl = remoteUrl;
-          } else if (mime.startsWith('video/')) {
-            newPost.videoUrl = remoteUrl;
-          } else {
-            newPost.documentUrl = remoteUrl;
-            newPost.documentName = name || 'Attached Document';
-          }
-        } catch (error) {
-          console.error('Upload failed, using local URI:', error);
-          const fallbackUrl = attachment.uri;
-          const mime = attachment.type || '';
-          const name = attachment.name || '';
-          if (mime.startsWith('image/')) {
-            newPost.imageUrl = fallbackUrl;
-          } else if (mime.startsWith('video/')) {
-            newPost.videoUrl = fallbackUrl;
-          } else {
-            newPost.documentUrl = fallbackUrl;
-            newPost.documentName = name || 'Attached Document';
-          }
-        }
-      }
-
       navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
       setPostContent('');
-      setAttachment(null);
     } catch (error) {
       console.error('Error uploading attachment:', error);
     } finally {
@@ -588,15 +534,6 @@ function CreatePostScreen({navigation, route}: any) {
       <Text style={styles.charCounter}>
         {postContent.length} / {MAX_POST_LENGTH}
       </Text>
-
-      <View style={styles.attachmentSection}>
-        <Button title="Attach File" onPress={handleFilePick} />
-        {attachment && (
-          <Text style={styles.attachmentName} numberOfLines={1}>
-            Attached: {attachment.name || 'File'}
-          </Text>
-        )}
-      </View>
 
       {isUploading && (
         <View style={styles.loadingContainer}>
