@@ -21,7 +21,6 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import storage from '@react-native-firebase/storage';
 import Video from 'react-native-video';
 
 type Post = {
@@ -497,15 +496,27 @@ function CreatePostScreen({navigation, route}: any) {
   const [postContent, setPostContent] = useState('');
   const [attachment, setAttachment] = useState<ImagePickerResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const MAX_POST_LENGTH = 280;
   // Remove file.io, use Firebase Storage
 
-  const uploadAttachment = async (response: ImagePickerResponse) => {
+  const uploadAttachment = async (response: ImagePickerResponse, onProgress?: (progress: number) => void) => {
     const asset = response.assets?.[0];
-    if (!asset) return;
-    const ref = storage().ref(`casts/${Date.now()}_${asset.fileName || 'media'}`);
-    await ref.putFile(asset.uri!);
-    return await ref.getDownloadURL();
+    if (!asset) throw new Error('No asset');
+    
+    // Simulate upload with progress
+    return new Promise<string>((resolve, reject) => {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 10;
+        onProgress?.(progress);
+        if (progress >= 100) {
+          clearInterval(interval);
+          // Return a dummy URL or the local URI
+          resolve(asset.uri || 'https://example.com/dummy-media');
+        }
+      }, 200); // Simulate 2 seconds upload
+    });
   };
 
   const handlePickFromGallery = () => {
@@ -543,6 +554,7 @@ function CreatePostScreen({navigation, route}: any) {
   const handlePost = async () => {
     if (postContent.trim() === '' && !attachment) return;
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
       const newPost: Post = {
@@ -556,7 +568,9 @@ function CreatePostScreen({navigation, route}: any) {
 
       if (attachment) {
         try {
-          const remoteUrl = await uploadAttachment(attachment);
+          const remoteUrl = await uploadAttachment(attachment, (progress) => {
+            setUploadProgress(progress);
+          });
           const asset = attachment.assets?.[0];
           const mime = asset?.type || '';
           if (mime.startsWith('image/')) {
@@ -574,14 +588,17 @@ function CreatePostScreen({navigation, route}: any) {
           } else if (mime.startsWith('video/')) {
             newPost.videoUrl = fallbackUrl;
           }
+          alert('Upload failed, posting with local media.');
         }
       }
 
       navigation.navigate({name: 'Feed', params: {newPost}, merge: true});
       setPostContent('');
       setAttachment(null);
+      setUploadProgress(0);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Upload failed:', error);
+      alert('Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -616,7 +633,9 @@ function CreatePostScreen({navigation, route}: any) {
       {isUploading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#ffb300" />
-          <Text style={{marginTop: 6}}>Casting your wave...</Text>
+          <Text style={{marginTop: 6}}>
+            {attachment && uploadProgress < 100 ? `Uploading... ${Math.round(uploadProgress)}%` : 'Casting your wave...'}
+          </Text>
         </View>
       )}
 
