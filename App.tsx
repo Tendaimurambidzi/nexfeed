@@ -107,7 +107,10 @@ function FeedScreen({navigation, route}: any) {
   const [commentText, setCommentText] = useState('');
   const [activePostForComment, setActivePostForComment] = useState<{postId: number} | null>(null);
   const [activeTab, setActiveTab] = useState('Tide');
+<<<<<<< HEAD
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+=======
+>>>>>>> 1ae324c99b321ca6d30a716bc4a779dbfc6cb85c
 
   // Load cached posts on startup
   useEffect(() => {
@@ -209,6 +212,7 @@ function FeedScreen({navigation, route}: any) {
           <Text style={[styles.content, styles.textWhite]}>{post.content}</Text>
           {post.imageUrl && <Image source={{uri: post.imageUrl}} style={styles.postImage} />}
           {post.videoUrl && (
+<<<<<<< HEAD
             playingVideoId === post.id ? (
               <Suspense fallback={<View style={styles.videoPreview}><Text>Loading...</Text></View>}>
                 <Video
@@ -231,6 +235,12 @@ function FeedScreen({navigation, route}: any) {
                 </View>
               </TouchableOpacity>
             )
+=======
+            <Image
+              source={{uri: post.imageUrl || 'https://img.icons8.com/ios-filled/100/000000/video.png'}}
+              style={[styles.postVideo, {resizeMode: 'cover', backgroundColor: '#000'}]}
+            />
+>>>>>>> 1ae324c99b321ca6d30a716bc4a779dbfc6cb85c
           )}
           {post.documentUrl && (
             <TouchableOpacity style={styles.documentContainer}>
@@ -261,7 +271,10 @@ function FeedScreen({navigation, route}: any) {
 
   return (
     <View style={styles.feedScreen}>
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1ae324c99b321ca6d30a716bc4a779dbfc6cb85c
 
       <FlatList
         data={posts}
