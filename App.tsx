@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, lazy, Suspense} from 'react';
 import {
   ActivityIndicator,
   Button,
@@ -21,7 +21,8 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import Video from 'react-native-video';
+const Video = lazy(() => import('react-native-video'));
+import { createThumbnail } from 'react-native-create-thumbnail';
 
 type Post = {
   id: number;
@@ -32,6 +33,7 @@ type Post = {
   liked: boolean;
   imageUrl?: string;
   videoUrl?: string;
+  thumbnailUri?: string;
   documentUrl?: string;
   documentName?: string;
 };
@@ -105,10 +107,7 @@ function FeedScreen({navigation, route}: any) {
   const [commentText, setCommentText] = useState('');
   const [activePostForComment, setActivePostForComment] = useState<{postId: number} | null>(null);
   const [activeTab, setActiveTab] = useState('Tide');
-  const videoCarouselRef = useRef<FlatList<Post>>(null);
-  const videoPosts = posts.filter(p => p.videoUrl);
-  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null);
+  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
 
   // Load cached posts on startup
   useEffect(() => {
@@ -192,42 +191,6 @@ function FeedScreen({navigation, route}: any) {
     if (action) action();
   };
 
-  const handleVideoMomentum = (event: any) => {
-    const viewWidth = event.nativeEvent.layoutMeasurement.width;
-    const contentOffset = event.nativeEvent.contentOffset.x;
-    const index = Math.round(contentOffset / viewWidth);
-    setActiveVideoIndex(index);
-  };
-
-  const goToVideo = (nextIndex: number) => {
-    if (nextIndex < 0 || nextIndex >= videoPosts.length) return;
-    videoCarouselRef.current?.scrollToIndex({index: nextIndex, animated: true});
-    setActiveVideoIndex(nextIndex);
-  };
-
-  const renderVideoSlide = ({item}: {item: Post}) => (
-    <View style={{width: 320}}>
-      <View style={styles.card}>
-        <View style={styles.cardTopSection}>
-          <View style={styles.cardHeader}>
-            <Image source={{uri: avatars[item.user] || avatars['Alice']}} style={styles.avatar} />
-            <Text style={[styles.username, styles.textWhite]}>{item.user}</Text>
-          </View>
-          <Text style={[styles.content, styles.textWhite]}>{item.content}</Text>
-          <TouchableOpacity onPress={() => setFullscreenVideo(item.videoUrl!)}>
-            <Image
-              source={{uri: item.imageUrl || 'https://img.icons8.com/ios-filled/100/000000/video.png'}}
-              style={[styles.postVideo, {resizeMode: 'cover', backgroundColor: '#000'}]}
-            />
-            <View style={{position: 'absolute', top: '40%', left: '45%'}}>
-              <Text style={{fontSize: 40, color: '#fff'}}>▶️</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-
   const renderPost = ({item: post}: {item: Post}) => (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -246,15 +209,28 @@ function FeedScreen({navigation, route}: any) {
           <Text style={[styles.content, styles.textWhite]}>{post.content}</Text>
           {post.imageUrl && <Image source={{uri: post.imageUrl}} style={styles.postImage} />}
           {post.videoUrl && (
-            <TouchableOpacity onPress={() => setFullscreenVideo(post.videoUrl!)}>
-              <Image
-                source={{uri: post.imageUrl || 'https://img.icons8.com/ios-filled/100/000000/video.png'}}
-                style={[styles.postVideo, {resizeMode: 'cover', backgroundColor: '#000'}]}
-              />
-              <View style={{position: 'absolute', top: '40%', left: '45%'}}>
-                <Text style={{fontSize: 40, color: '#fff'}}>▶️</Text>
-              </View>
-            </TouchableOpacity>
+            playingVideoId === post.id ? (
+              <Suspense fallback={<View style={styles.videoPreview}><Text>Loading...</Text></View>}>
+                <Video
+                  source={{uri: post.videoUrl}}
+                  style={styles.postImage}
+                  controls={true}
+                  paused={false}
+                  onEnd={() => setPlayingVideoId(null)}
+                  resizeMode="contain"
+                />
+              </Suspense>
+            ) : (
+              <TouchableOpacity onPress={() => setPlayingVideoId(post.id)}>
+                <Image
+                  source={{uri: post.thumbnailUri || post.imageUrl || 'https://img.icons8.com/ios-filled/100/000000/video.png'}}
+                  style={[styles.postVideo, {resizeMode: 'cover', backgroundColor: '#000'}]}
+                />
+                <View style={{position: 'absolute', top: '40%', left: '45%'}}>
+                  <Text style={{fontSize: 40, color: '#fff'}}>▶️</Text>
+                </View>
+              </TouchableOpacity>
+            )
           )}
           {post.documentUrl && (
             <TouchableOpacity style={styles.documentContainer}>
@@ -285,30 +261,6 @@ function FeedScreen({navigation, route}: any) {
 
   return (
     <View style={styles.feedScreen}>
-      {videoPosts.length > 0 && (
-        <View style={{paddingVertical: 8}}>
-          <Text style={{paddingHorizontal: 16, fontWeight: '700', color: '#1877f2'}}>Videos</Text>
-          <FlatList
-            ref={videoCarouselRef}
-            data={videoPosts}
-            renderItem={renderVideoSlide}
-            keyExtractor={item => `video-${item.id}`}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleVideoMomentum}
-            contentContainerStyle={{paddingHorizontal: 16, gap: 12}}
-          />
-          <View style={{flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 6}}>
-            <Button title="Prev" onPress={() => goToVideo(activeVideoIndex - 1)} disabled={activeVideoIndex === 0} />
-            <Button
-              title="Next"
-              onPress={() => goToVideo(activeVideoIndex + 1)}
-              disabled={activeVideoIndex >= videoPosts.length - 1}
-            />
-          </View>
-        </View>
-      )}
 
 
       <FlatList
@@ -320,30 +272,6 @@ function FeedScreen({navigation, route}: any) {
         showsVerticalScrollIndicator={false}
         inverted
       />
-
-      {/* Fullscreen Video Modal */}
-      <Modal
-        visible={!!fullscreenVideo}
-        animationType="slide"
-        onRequestClose={() => setFullscreenVideo(null)}
-        transparent={false}
-      >
-        <View style={{flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center'}}>
-          <Video
-            source={{uri: fullscreenVideo || ''}}
-            style={{width: '100%', height: 400, backgroundColor: '#000'}}
-            controls
-            resizeMode="contain"
-            paused={false}
-          />
-          <TouchableOpacity
-            onPress={() => setFullscreenVideo(null)}
-            style={{position: 'absolute', top: 40, left: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 20}}
-          >
-            <Text style={{color: '#fff', fontSize: 24}}>← Back</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
 
       <Modal
         animationType="slide"
@@ -577,6 +505,16 @@ function CreatePostScreen({navigation, route}: any) {
             newPost.imageUrl = remoteUrl;
           } else if (mime.startsWith('video/')) {
             newPost.videoUrl = remoteUrl;
+            // Generate thumbnail
+            try {
+              const thumbnail = await createThumbnail({
+                url: remoteUrl,
+                timeStamp: 1000,
+              });
+              newPost.thumbnailUri = thumbnail.path;
+            } catch (e) {
+              console.error('Thumbnail generation failed:', e);
+            }
           }
         } catch (error) {
           console.error('Upload failed, using local URI:', error);
@@ -587,6 +525,16 @@ function CreatePostScreen({navigation, route}: any) {
             newPost.imageUrl = fallbackUrl;
           } else if (mime.startsWith('video/')) {
             newPost.videoUrl = fallbackUrl;
+            // Generate thumbnail for local video
+            try {
+              const thumbnail = await createThumbnail({
+                url: fallbackUrl!,
+                timeStamp: 1000,
+              });
+              newPost.thumbnailUri = thumbnail.path;
+            } catch (e) {
+              console.error('Thumbnail generation failed:', e);
+            }
           }
           alert('Upload failed, posting with local media.');
         }
